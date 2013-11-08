@@ -11,6 +11,7 @@ byte stripBufferB[PIXEL_COUNT];
 boolean brightnessSemaphore = false;
 boolean speedSemaphore = false;
 boolean modeSemaphore = false;
+boolean drawSingleFrame = false;
 
 // Debounce counters (testing showed that calling millis() is unecessary)
 int brightnessCounter = 0;
@@ -101,17 +102,19 @@ void updateOrion() {
     
     if(brightnessCounter>10)
       {
-      brightness++;
-      
-     if(brightness > NUMBER_BRIGHTNESS_LEVELS-1)
-       brightness = 0;
-       
       brightnessSemaphore = false; 
       brightnessCounter = 0; 
       
+      brightness++;
+      
+     if(brightness > NUMBER_BRIGHTNESS_LEVELS-1)
+      brightness = 0;
+
       if(brightness == 0)
       {
         strip.setBrightness(255);    
+        if(syspeed == NUMBER_SPEED_SETTINGS)
+          drawSingleFrame = true;
       } else {
         strip.setBrightness((255/NUMBER_BRIGHTNESS_LEVELS)*(NUMBER_BRIGHTNESS_LEVELS-brightness));    
       }
@@ -158,7 +161,7 @@ void updateOrion() {
         
       // Force redraw of new mode by increasing the speed from paused.
       if(syspeed == NUMBER_SPEED_SETTINGS)
-         syspeed = NUMBER_SPEED_SETTINGS-1;
+         drawSingleFrame = true;
          
       frameStep = 0;
       animationStep = 0;
@@ -181,8 +184,11 @@ void updateOrion() {
     return;
     
   //Pause animations if speed is set to highest (slowest) setting.
-  if(syspeed == NUMBER_SPEED_SETTINGS)
+  if(syspeed == NUMBER_SPEED_SETTINGS && !drawSingleFrame)
     return;
+    
+  if(drawSingleFrame)
+    drawSingleFrame = false;
     
   previousMillis = currentMillis;
 

@@ -44,7 +44,8 @@ class LPD8806 {
     *pixels,    // Holds LED color values (3 bytes each) + latch
     clkpin    , datapin,     // Clock & data pin numbers
     clkpinmask, datapinmask, // Clock & data PORT bitmasks
-    brightness;    // Global brightness
+    brightness,    // Global brightness
+    oldBrightness;
   volatile uint8_t
     *clkport  , *dataport;   // Clock & data PORT registers
   void

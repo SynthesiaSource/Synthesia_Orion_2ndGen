@@ -68,7 +68,7 @@
 // Defines LED type. 
 // Type 0 is LPD8806
 // Type 1 is WS2811
-#define LED_TYPE      1
+#define LED_TYPE      0
 
 #if LED_TYPE == 0
 #define WHEEL_RANGE  384
@@ -90,7 +90,6 @@ void enable(boolean setBegun);
 void disable(void);
 boolean isEnabled(void);
 boolean isDisabled(void);
-
 
 // Available modes. Additional modes are available at www.synthesia.ca
 void solidColor(void);

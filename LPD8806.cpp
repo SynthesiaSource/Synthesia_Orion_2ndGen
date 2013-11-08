@@ -74,6 +74,7 @@ LPD8806::LPD8806(uint16_t n) {
   begun  = false;
   enabled = false;
   brightness = 0;
+  oldBrightness = 0;
   updateLength(n);
   updatePins();
 }
@@ -84,6 +85,7 @@ LPD8806::LPD8806(uint16_t n, uint8_t dpin, uint8_t cpin) {
   begun  = false;
   enabled = false;
   brightness = 0;
+  oldBrightness = 0;
   updateLength(n);
   updatePins(dpin, cpin);
 }
@@ -337,8 +339,8 @@ void LPD8806::setPixelColor(uint16_t n, uint8_t r, uint8_t g, uint8_t b) {
 void LPD8806::setPixelColor(uint16_t n, uint32_t c) {
   if(n < numLEDs) { // Arrays are 0-indexed, thus NOT '<='
       uint8_t
-      r = (uint8_t)((c >> 16) & 0x7f),
-      g = (uint8_t)((c >>  8) & 0x7f),
+      g = (uint8_t)((c >> 16) & 0x7f),
+      r = (uint8_t)((c >>  8) & 0x7f),
       b = (uint8_t)(c        & 0x7f);
     if(brightness != 0) 
     {
@@ -377,31 +379,26 @@ void LPD8806::setBrightness(uint8_t b) {
   // Redraw the pixels
   if(newBrightness != brightness) { // Compare against prior value
     // Brightness has changed -- re-scale existing data in RAM
-//    uint8_t  c,
-//            *ptr           = pixels,
-//             oldBrightness = brightness; // De-wrap old brightness value
-//    uint16_t scale;
-//    if(oldBrightness == 0) scale = 0; // Avoid /0
-//    else if(b == 255) scale = 65535 / oldBrightness;
-//    else scale = (uint8_t)(((uint16_t)newBrightness << 8) - 1) / oldBrightness;
-//    
-//    for(uint16_t i=0; i<numLEDs; i++) 
-//    {
-//      uint32_t singlePixel = getPixelColor(i);
-//      uint8_t
-//      rt = ((singlePixel >> 16) & 0x7f),
-//      gt = ((singlePixel >>  8) & 0x7f),
-//      bt = (singlePixel        & 0x7f);
-//
-//      uint8_t r = (uint8_t)((rt * scale) >> 8);
-//      uint8_t g = (uint8_t)((gt * scale) >> 8);
-//      uint8_t b = (uint8_t)((bt * scale) >> 8);
-//
-//      uint8_t *p = &pixels[i * 3];
-//      *p++ = g | 0x80; // Strip color order is GRB,
-//      *p++ = r | 0x80; // not the more common RGB,
-//      *p++ = b | 0x80; // so the order here is intentional; don't "fix"
-//    }
+    uint8_t  c,
+            *ptr           = pixels;
+    uint16_t scale;
+    if(oldBrightness == 0) scale = 0; // Avoid /0
+    else if(b == 255) scale = 65535 / oldBrightness;
+    else scale = (uint8_t)((newBrightness << 8) - 1) / oldBrightness;
+
     brightness = newBrightness;
+    oldBrightness = newBrightness;
+
+    // Force re-draw of the LEDs
+    for(uint16_t i=0; i<numLEDs; i++) 
+    {
+      uint32_t singlePixel = getPixelColor(i);
+      uint8_t
+      gt = (uint8_t)((singlePixel >> 16) & 0x7f),
+      rt = (uint8_t)((singlePixel >>  8) & 0x7f),
+      bt = (uint8_t)(singlePixel        & 0x7f);
+
+      setPixelColor(i, rt, gt, bt);
+    }
   }
 }
