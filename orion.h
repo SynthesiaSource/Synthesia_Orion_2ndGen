@@ -70,6 +70,13 @@
 // Type 1 is WS2811
 #define LED_TYPE      1
 
+#if LED_TYPE == 0
+#define WHEEL_RANGE  384
+#endif
+#if LED_TYPE == 1
+#define WHEEL_RANGE  255
+#endif
+
 #define PI 3.14159265
 #define dist(a, b, c, d) sqrt(double((a - c) * (a - c) + (b - d) * (b - d)))
 
@@ -91,22 +98,20 @@ void rainbow(void);
 void plasma(void);
 void splitColorBuilder(void);
 void smoothColors(void);
-void fadeIn(uint32_t c, uint16_t wait);
-void fadeOut(uint32_t c, uint16_t wait);
+void fadeIn(uint32_t c);
+void fadeOut(uint32_t c);
 void sparkler(void);
-void rainbowCycle(uint16_t wait);                 // Standard rainbow mode. Medium drain mode.
-void rainbowStrobe(uint16_t wait);                // Steps through the rainbow, pulsing all the way. Medium drain mode.
-void rainbowBreathing(uint16_t wait);             // Slow pulsating rainbow. Medium drain mode.
-void pulseStrobe(uint32_t c, uint16_t wait);      // Fast flashy strobe. Medium drain mode.
-void smoothStrobe(uint32_t c, uint16_t wait);     // Pulses a color on and off. Medium drain mode.
-void colorChase(uint32_t c, uint16_t wait);       // Single pixel random color chase. Low drain mode.
-void colorWipe(uint32_t c, uint16_t wait);        // Random color fill. Medium drain mode.
-void dither(uint32_t c, uint16_t wait);           // Random multi-color dither. Medium drain mode.
-void scanner(uint32_t c, uint16_t wait);          // Bounced a 5 pixel wide color band across the strip.
-void wave(uint32_t c, uint16_t wait);             // Sine wave color ranges from full white to c. Random colors. High drain mode.
-void randomSparkle(uint16_t wait);                // Sparkles with random colors at random points. Medium drain mode.
-void canada();
-void canada2();
+void rainbowCycle();                 // Standard rainbow mode. Medium drain mode.
+void rainbowStrobe();                // Steps through the rainbow, pulsing all the way. Medium drain mode.
+void rainbowBreathing();             // Slow pulsating rainbow. Medium drain mode.
+void pulseStrobe(uint32_t c);        // Fast flashy strobe. Medium drain mode.
+void smoothStrobe(uint32_t c);       // Pulses a color on and off. Medium drain mode.
+void colorChase(uint32_t c);         // Single pixel random color chase. Low drain mode.
+void colorWipe(uint32_t c);          // Random color fill. Medium drain mode.
+void dither(uint32_t c);             // Random multi-color dither. Medium drain mode.
+void scanner(uint32_t c);            // Bounced a 5 pixel wide color band across the strip.
+void wave(uint32_t c);               // Sine wave color ranges from full white to c. Random colors. High drain mode.
+void randomSparkle();                // Sparkles with random colors at random points. Medium drain mode.
 void fullWhiteTest();
 
 // Internal utility functions.

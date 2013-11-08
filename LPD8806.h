@@ -37,7 +37,6 @@ class LPD8806 {
     getPixelColor(uint16_t n);
 
  private:
-
   uint16_t
     numLEDs,    // Number of RGB LEDs in strip
     numBytes;   // Size of 'pixels' buffer below

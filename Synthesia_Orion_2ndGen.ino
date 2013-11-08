@@ -90,19 +90,5 @@ void loop() {
 
 } // loop()
 
-
-//// On-awake functions.
-//void sleepHandler() {
-//  
-////  // Remove the now superfluous interrupt
-////  detachInterrupt(INT0); 
-////  
-////  // Reinstate the regular one
-////  attachInterrupt(INT0, &togglePower, FALLING);
-//  
-//  // Turn the LEDs back on
-//  togglePower();
-//}
-
 // End of file.
 

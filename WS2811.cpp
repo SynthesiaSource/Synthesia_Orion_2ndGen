@@ -58,7 +58,6 @@ void WS2811::begin(void) {
 void WS2811::enable(boolean setBegun = false) {
   // Power up the led strip.
   digitalWrite(13, LOW);
-  delay(250);
   
   enabled = true;
   
