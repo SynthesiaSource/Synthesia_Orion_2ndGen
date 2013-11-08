@@ -1,25 +1,40 @@
 #include "WS2811.h"
+#include "LPD8806.h"
 #include "orion.h"
 #include "gamma.h"
-#include "LPD8806.h"
-
+#include "pins.h"
 
 byte stripBufferA[PIXEL_COUNT];
 byte stripBufferB[PIXEL_COUNT];
 
+// Semaphores for button interrupts
 boolean brightnessSemaphore = false;
 boolean speedSemaphore = false;
 boolean modeSemaphore = false;
 
+// Debounce counters (testing showed that calling millis() is unecessary)
+int brightnessCounter = 0;
+int speedCounter = 0;
+int modeCounter = 0;
+
 uint32_t pixelBuffer[PIXEL_COUNT];
 
-int animationStep; // Used for incrementing animations (0-384)
+int animationStep; // Used for incrementing animations (0-255)
 int frameStep;     // Used to increment frame counts.
 int mode;          // System mode
 int syspeed;         // System animation speed control
 int brightness;    // System brightness control
 
-WS2811 strip = WS2811(PIXEL_COUNT, MOSI, NEO_GRB + NEO_KHZ800);
+//static int frameDelayTimer = 5;
+//static long previousMillis = 0;
+//unsigned long currentMillis = millis();
+
+//#if LED_TYPE == 0
+//    LPD8806 strip = LPD8806(PIXEL_COUNT);
+//#endif
+#if LED_TYPE == 1
+    WS2811 strip = WS2811(PIXEL_COUNT, MOSI, NEO_GRB + NEO_KHZ800);
+#endif
 
 void stepMode(void) {
   modeSemaphore = true;  
@@ -53,69 +68,71 @@ boolean isDisabled(void) {
 } // isDisabled()
 
 
+// Decrecated in favor of new WS2811 method for changing global brightness
 // Set pixel at globalBrightness
-void setPixelAtBrightness(int i, uint32_t c)
-{
-   int  r, g, b;
-  
-//  g = ((c >> 16) & 0x7f)*(brightnessFraction);
-//  r = ((c >>  8) & 0x7f)*(brightnessFraction);
-//  b = (c        & 0x7f)*(brightnessFraction); 
-
-  // Extract RGB channels
-  g = ((c >> 16) & 0x7f);
-  r = ((c >>  8) & 0x7f);
-  b = (c        & 0x7f); 
-  
-   // Fast bitshift calculation
-   // Using floating point calulations in this constantly called method
-   // results in really low frame rates
-   switch(brightness) 
-  {
-    case 1:
-    {
-      break;
-    }
-    case 2:
-    {
-      g = (g << 1)+g;
-      r = (r << 1)+r;
-      b = (b << 1)+b;
-      
-      g >>= 2;
-      r >>= 2;
-      b >>= 2;   
-      break;
-    }
-    case 3:
-    { 
-      g >>= 1;
-      r >>= 1;
-      b >>= 1;
-      break;
-    }
-    case 4:
-    {
-      g >>= 2;
-      r >>= 2;
-      b >>= 2;   
-      break;
-    }
-    case 5:
-    {
-      g >>= 3;
-      r >>= 3;
-      b >>= 3;   
-      break;
-    }
-     default: break;
-  }
-  
-  strip.setPixelColor(i, r, g, b); 
-}
+//void setPixelAtBrightness(int i, uint32_t c)
+//{
+//   int  r, g, b;
+//  
+////  g = ((c >> 16) & 0x7f)*(brightnessFraction);
+////  r = ((c >>  8) & 0x7f)*(brightnessFraction);
+////  b = (c        & 0x7f)*(brightnessFraction); 
+//
+//  // Extract RGB channels
+//  g = ((c >> 16) & 0x7f);
+//  r = ((c >>  8) & 0x7f);
+//  b = (c        & 0x7f); 
+//  
+//   // Fast bitshift calculation
+//   // Using floating point calulations in this constantly called method
+//   // results in really low frame rates
+//   switch(brightness) 
+//  {
+//    case 1:
+//    {
+//      break;
+//    }
+//    case 2:
+//    {
+//      g = (g << 1)+g;
+//      r = (r << 1)+r;
+//      b = (b << 1)+b;
+//      
+//      g >>= 2;
+//      r >>= 2;
+//      b >>= 2;   
+//      break;
+//    }
+//    case 3:
+//    { 
+//      g >>= 1;
+//      r >>= 1;
+//      b >>= 1;
+//      break;
+//    }
+//    case 4:
+//    {
+//      g >>= 2;
+//      r >>= 2;
+//      b >>= 2;   
+//      break;
+//    }
+//    case 5:
+//    {
+//      g >>= 3;
+//      r >>= 3;
+//      b >>= 3;   
+//      break;
+//    }
+//     default: break;
+//  }
+//  
+//  strip.setPixelColor(i, r, g, b); 
+//}
 
 
 void setupOrion() {
+
   for(int u = 0; u<PIXEL_COUNT; u++)
     pixelBuffer[u] = 0;
   
@@ -137,52 +154,83 @@ void updateOrion() {
     
   if(brightnessSemaphore)
   {  
-    noInterrupts();
-    delay(500);
-    brightness++;
-     
-   if(brightness > NUMBER_BRIGHTNESS_LEVELS)
-     brightness = 1;
-     
-     brightnessSemaphore = false;
-    interrupts();
+    if(digitalRead(PIN_BUTTON_LEVEL)==HIGH)
+    {
+      brightnessCounter++; 
+    } else {
+       brightnessSemaphore = false; // Disarm the semaphore (button press time < minimum) 
+    }
+    
+    if(brightnessCounter>10)
+      {
+      brightness++;
+      
+     if(brightness > NUMBER_BRIGHTNESS_LEVELS)
+       brightness = 1;
+       
+      brightnessSemaphore = false; 
+      brightnessCounter = 0; 
+      strip.setBrightness((255/NUMBER_BRIGHTNESS_LEVELS)*(NUMBER_BRIGHTNESS_LEVELS-(brightness-1)));    
+      strip.show();
+      }
   }
 
   if(speedSemaphore)
   {  
-    noInterrupts();
-    delay(200);
-    syspeed++;
+    if(digitalRead(PIN_BUTTON_SPEED)==HIGH)
+    {
+      speedCounter++; 
+    } else {
+      speedSemaphore = false; // Disarm the semaphore (button press time < minimum) 
+    }
     
-     if(syspeed > NUMBER_SPEED_SETTINGS)
-       syspeed = 0;
-       
-     speedSemaphore = false;
-    interrupts();
+    if(speedCounter>10)
+      {
+      syspeed++;
+      
+       if(syspeed > NUMBER_SPEED_SETTINGS)
+         syspeed = 0;
+         
+       speedSemaphore = false;
+       speedCounter = 0;
+      }
   }
   
   if(modeSemaphore)
   { 
-    noInterrupts();
-    delay(500);
-    mode++;
-     
-    if(mode > NUMBER_OF_MODES)
-      mode = 0;
+    if(digitalRead(PIN_BUTTON_MODE)==HIGH)
+    {
+      modeCounter++; 
+    } else {
+      modeSemaphore = false; // Disarm the semaphore (button press time < minimum) 
+    }
+    
+    if(modeCounter>10)
+      {
+      mode++;
        
-    frameStep = 0;
-    animationStep = 0;
-    modeSemaphore = false;
-    interrupts();
+      if(mode > NUMBER_OF_MODES)
+        mode = 0;
+         
+      frameStep = 0;
+      animationStep = 0;
+      modeSemaphore = false;
+      modeCounter = 0;
+      }
   }  
+  
   // Used to store a current color for modes which cycle through colors.
   static uint32_t currentColor;
 
   // This is used to calibrate the speed range for different modes
   // Slow modes require a low frameDelayTimer (1-5). Fast modes require a high frameDelayTimer (5+).
+  // millis() rolls over after 49 days of operation. 
+
+//  currentMillis = millis();
   static int frameDelayTimer = 5;
   static long previousMillis = 0;
   unsigned long currentMillis = millis();
+
 
   // If insufficient time has elapsed since the last call just return and do nothing.
   if(currentMillis - previousMillis < frameDelayTimer*syspeed)    
@@ -214,36 +262,34 @@ void updateOrion() {
     case 5:
       // Single pixel random color pixel chase.
       if(animationStep == 0)
-        currentColor =Wheel(random(0, 384));
+        currentColor =Wheel(random(0, 255));
       colorChase(currentColor, syspeed);
       frameDelayTimer = 5;    
       break;
     case 6:
       // Random color wipe.
       if(frameStep == 0)
-        currentColor = Wheel(random(0, 384));
+        currentColor = Wheel(random(0, 255));
       colorWipe(currentColor, syspeed);
       frameDelayTimer = 5;    
       break;
     case 7:
       // Random color dither. This is a color to color dither (does not clear between colors).
-      {
-        long randNumber = random(0, 384);
-        uint32_t c = Wheel(((randNumber * 384 / strip.numPixels()) + randNumber) % 384);
-        dither(c, syspeed);
-      }  
+      if(frameStep == 0)
+        currentColor = Wheel(random(0, 255));
+      dither(currentColor, syspeed);
       frameDelayTimer = 8;    
       break;
     case 8:
-      if(animationStep == 0)
-        currentColor = Wheel(random(0, 384));
+      if(frameStep == 0)
+        currentColor = Wheel(random(0, 255));
       scanner(currentColor, syspeed);  
       frameDelayTimer = 5;    
       break;
     case 9:
       // Sin wave effect. New color every cycle.
       if(animationStep == 0)
-        currentColor = Wheel(random(0, 384));
+        currentColor = Wheel(random(0, 255));
       wave(currentColor, syspeed);  
       frameDelayTimer = 5;    
       break;
@@ -255,7 +301,7 @@ void updateOrion() {
     case 11:
       // Color fade-in fade-out effect
       if(animationStep==0)
-        currentColor =Wheel(random(0, 384));
+        currentColor =Wheel(random(0, 255));
       
       if(animationStep<192)
         fadeIn(currentColor, 10); 
@@ -272,10 +318,10 @@ void updateOrion() {
       ; // This should never happen. 
   } // switch()
   
-  // Global animation frame limit of 384 (for full color wheel range).
+  // Global animation frame limit of 255 (for full color wheel range).
   // Large animationSteps slow down the driver.
   animationStep++;
-  if(animationStep>384)
+  if(animationStep>255)
     animationStep = 0;
   
   // Ensure that only as many pixels are drawn as there are in the strip.
@@ -305,9 +351,9 @@ void plasma() {
                    + sin(dist(frameStep, y + time / 7, 95.0, 32) / 3.5);
                    + sin(dist(frameStep, y, 95.0, 50.0) / 4.0);
   
-      int color = int((4 + value)*384)%384;
-      setPixelAtBrightness(y, Wheel(color));
-      //strip.setPixelColor(y, Wheel(color)); 
+      int color = int((4 + value)*255)%255;
+//      setPixelAtBrightness(y, Wheel(color));
+      strip.setPixelColor(y, Wheel(color)); 
     }    
   strip.show();
 }
@@ -321,11 +367,11 @@ void sparkler() {
       byte newPoint = (stripBufferA[x] + stripBufferA[x+1]) / 2 - 15;
       stripBufferB[x] = newPoint;
       if(newPoint>50)
-        setPixelAtBrightness(x, Wheel(((newPoint/5)+animationStep)%384));
-//         strip.setPixelColor(x, Wheel(((newPoint/5)+animationStep)%384));      
+//        setPixelAtBrightness(x, Wheel(((newPoint/5)+animationStep)%255));
+         strip.setPixelColor(x, Wheel(((newPoint/5)+animationStep)%255));      
       if(newPoint<50)
-        setPixelAtBrightness(x, strip.Color(0, 0, 0));
-//         strip.setPixelColor(x, strip.Color(0,0,0)); 
+//        setPixelAtBrightness(x, strip.Color(0, 0, 0));
+         strip.setPixelColor(x, strip.Color(0,0,0)); 
     }
    
    strip.show();
@@ -349,7 +395,7 @@ void rainbowBreathing(uint16_t wait)
     for (i=0; i < strip.numPixels(); i++) 
       {
         
-      uint32_t c =  Wheel(((i * 384 / PIXEL_COUNT)) % 384);
+      uint32_t c =  Wheel(((i * 255 / PIXEL_COUNT)) % 255);
  
       byte  r, g, b;
       
@@ -358,8 +404,8 @@ void rainbowBreathing(uint16_t wait)
       r = (c >>  8) & 0x7f;
       b =  c        & 0x7f; 
      
-      setPixelAtBrightness(i, strip.Color(r*modifier, g*modifier, b*modifier));
-      //strip.setPixelColor(i, r*modifier, g*modifier, b*modifier);
+//      setPixelAtBrightness(i, strip.Color(r*modifier, g*modifier, b*modifier));
+      strip.setPixelColor(i, r*modifier, g*modifier, b*modifier);
 //      strip.setPixelColor(i, gamma(r*modifier), gamma(g*modifier), gamma(b*modifier));
     }
   strip.show();   // write all the pixels out
@@ -369,7 +415,7 @@ void rainbowBreathing(uint16_t wait)
     for (i=0; i < strip.numPixels(); i++) 
       {
         
-      uint32_t c =  Wheel(((i * 384 / PIXEL_COUNT)+shifter) % 384);
+      uint32_t c =  Wheel(((i * 255 / PIXEL_COUNT)+shifter) % 255);
  
       byte  r, g, b;
       
@@ -378,9 +424,8 @@ void rainbowBreathing(uint16_t wait)
       r = (c >>  8) & 0x7f;
       b =  c        & 0x7f; 
      
-      setPixelAtBrightness(i, strip.Color( r*modifier, g*modifier, b*modifier));
-
-     // strip.setPixelColor(i, r*modifier, g*modifier, b*modifier);
+//      setPixelAtBrightness(i, strip.Color( r*modifier, g*modifier, b*modifier));
+     strip.setPixelColor(i, r*modifier, g*modifier, b*modifier);
 //      strip.setPixelColor(i, gamma(r*modifier), gamma(g*modifier), gamma(b*modifier));
     }
   strip.show();   // write all the pixels out   
@@ -394,7 +439,8 @@ void rainbow() {
 
       for (i=0; i < strip.numPixels(); i++) 
       {
-        setPixelAtBrightness(i, Wheel(((i * 384 / pixelCount) + animationStep) % 384));
+//        setPixelAtBrightness(i, Wheel(((i * 255 / pixelCount) + animationStep) % 255));
+        strip.setPixelColor(i, Wheel(((i * 255 / pixelCount) + animationStep) % 255)); 
       }
       strip.show();   // write all the pixels out
 }
@@ -419,8 +465,10 @@ void splitColorBuilder() {
 
   for (i=0; i < (strip.numPixels()/2)+1; i++) 
   {
-    setPixelAtBrightness(PIXEL_COUNT/2-i, pixelBuffer[i]);
-    setPixelAtBrightness(PIXEL_COUNT/2+i, pixelBuffer[i]); 
+//    setPixelAtBrightness(PIXEL_COUNT/2-i, pixelBuffer[i]);
+//    setPixelAtBrightness(PIXEL_COUNT/2+i, pixelBuffer[i]); 
+    strip.setPixelColor(PIXEL_COUNT/2-i, pixelBuffer[i]); 
+    strip.setPixelColor(PIXEL_COUNT/2+i, pixelBuffer[i]); 
   }
   
   strip.show();   // write all the pixels out
@@ -436,14 +484,13 @@ void splitColorBuilder() {
 void smoothColors() {
   uint16_t i, j;
   int pixelCount = strip.numPixels();
-  uint32_t c = Wheel(((i * 384 / pixelCount) + animationStep) % 384);
+  uint32_t c = Wheel(((i * 255 / pixelCount) + animationStep) % 255);
   pixelBuffer[0] = c;
   
       for (i=0; i < strip.numPixels(); i++) 
       {
-        //strip.setPixelColor(i, Wheel(((i * 384 / pixelCount) + animationStep) % 384));
-        setPixelAtBrightness(i, c);
-        
+        strip.setPixelColor(i, c);
+//        setPixelAtBrightness(i, c);
       }
       strip.show();   // write all the pixels out
 }
@@ -503,8 +550,8 @@ void fadeOut(uint32_t c, uint16_t wait)
       
     for (int i=0; i < strip.numPixels(); i++) 
     {
-      //strip.setPixelColor(i, r2, g2, b2);
-      setPixelAtBrightness(i, strip.Color(r2, g2, b2));  
+      strip.setPixelColor(i, r2, g2, b2);
+//      setPixelAtBrightness(i, strip.Color(r2, g2, b2));  
     }
     
     strip.show();   // write all the pixels out
@@ -561,8 +608,8 @@ void fadeIn(uint32_t c, uint16_t wait)
       }
     for (int i=0; i < strip.numPixels(); i++) 
     {
-      setPixelAtBrightness(i, strip.Color(r2, g2, b2));
-//      strip.setPixelColor(i, r2, g2, b2);
+//      setPixelAtBrightness(i, strip.Color(r2, g2, b2));
+      strip.setPixelColor(i, r2, g2, b2);
     }
     
     strip.show();   // write all the pixels out
@@ -575,11 +622,11 @@ void pulseStrobe(uint32_t c, uint16_t wait)
     {
       if(animationStep%2)
         {
-          setPixelAtBrightness(i, dampenBrightness(c, animationStep));
-//        strip.setPixelColor(i, dampenBrightness(c, animationStep));
+//          setPixelAtBrightness(i, dampenBrightness(c, animationStep));
+        strip.setPixelColor(i, dampenBrightness(c, animationStep));
         } else {
-          setPixelAtBrightness(i, dampenBrightness(c,10));
-//        strip.setPixelColor(i, dampenBrightness(c, 10)); 
+//          setPixelAtBrightness(i, dampenBrightness(c,10));
+        strip.setPixelColor(i, dampenBrightness(c, 10)); 
         }
     
     strip.show();   // write all the pixels out  
@@ -592,11 +639,10 @@ void rainbowCycle(uint16_t wait) {
   uint16_t i, j;
   for (i=0; i < strip.numPixels(); i++) 
   {
-    setPixelAtBrightness(i, Wheel(((i * 384 / strip.numPixels()) + animationStep) % 384));
-//    strip.setPixelColor(i, Wheel(((i * 384 / strip.numPixels()) + animationStep) % 384));
+//    setPixelAtBrightness(i, Wheel(((i * 255 / strip.numPixels()) + animationStep) % 255));
+    strip.setPixelColor(i, Wheel(((i * 255 / strip.numPixels()) + animationStep) % 255));
   }
   strip.show();   // write all the pixels out
-  delay(wait);
   animationStep++;
 }
 
@@ -607,7 +653,8 @@ void colorWipe(uint32_t c, uint16_t wait) {
  
   for (i=0; i < frameStep; i++) 
     {
-    setPixelAtBrightness(i, c);
+//    setPixelAtBrightness(i, c);
+    strip.setPixelColor(i, c);
     }
    
     strip.show(); 
@@ -619,8 +666,10 @@ void colorWipe(uint32_t c, uint16_t wait) {
 void colorChase(uint32_t c, uint16_t wait) {
   int i;
 
-    setPixelAtBrightness(frameStep-1, 0); // Erase pixel, but don't refresh!
-    setPixelAtBrightness(frameStep, c); // Set new pixel 'on'
+//    setPixelAtBrightness(frameStep-1, 0); // Erase pixel, but don't refresh!
+//    setPixelAtBrightness(frameStep, c); // Set new pixel 'on'
+    strip.setPixelColor(frameStep-1, 0); 
+    strip.setPixelColor(frameStep, c); 
     strip.show(); // Refresh LED states
 }
 
@@ -637,19 +686,19 @@ void dither(uint32_t c, uint16_t wait) {
   }
 
   int bit, reverse;
-  for(int i=0; i<(hiBit << 1); i++) {
+  for(int i=frameStep; i<frameStep+1; i++) 
+  {
     // Reverse the bits in i to create ordered dither:
     reverse = 0;
     for(bit=1; bit <= hiBit; bit <<= 1) {
       reverse <<= 1;
       if(i & bit) reverse |= 1;
     }
-    setPixelAtBrightness(reverse, c);
-    //strip.setPixelColor(reverse, c);
+//    setPixelAtBrightness(reverse, c);
+    strip.setPixelColor(reverse, c);
     strip.show();
-    delay(wait);
+//    delay();
   }
-  delay(wait);  
 }
 
 
@@ -661,8 +710,9 @@ void randomSparkle(uint16_t wait) {
   uint16_t i, j;
 
   randNumber = random(0, strip.numPixels()-1);
-  setPixelAtBrightness(randNumber, Wheel(random(0,384)));
-  //strip.setPixelColor(randNumber, Wheel(((frameStep * 384 / strip.numPixels()) + animationStep) % 384));
+//  setPixelAtBrightness(randNumber, Wheel(random(0,255)));
+  //strip.setPixelColor(randNumber, Wheel(((frameStep * 255 / strip.numPixels()) + animationStep) % 255));
+  strip.setPixelColor(randNumber, Wheel(random(0,255))); 
   strip.show();
 
 
@@ -751,7 +801,6 @@ void canada() {
     strip.setPixelColor(pos + 4, strip.Color(127, 0, 0));
    
    
-
     strip.show();
     // If we wanted to be sneaky we could erase just the tail end
     // pixel, but it's much easier just to erase the whole thing
@@ -810,11 +859,18 @@ void scanner(uint32_t c, uint16_t wait) {
     // we'll make the colors dimmer at the edges for a nice pulse
     // look
     
-    setPixelAtBrightness(pos - 2, strip.Color(r/4, g/4, b/4));
-    setPixelAtBrightness(pos - 1, strip.Color(r/2, g/2, b/2));
-    setPixelAtBrightness(pos, strip.Color(r, g, b));
-    setPixelAtBrightness(pos + 1, strip.Color(r/2, g/2, b/2));
-    setPixelAtBrightness(pos + 2, strip.Color(r/4, g/4, b/4));
+//    setPixelAtBrightness(pos - 2, strip.Color(r/4, g/4, b/4));
+//    setPixelAtBrightness(pos - 1, strip.Color(r/2, g/2, b/2));
+//    setPixelAtBrightness(pos, strip.Color(r, g, b));
+//    setPixelAtBrightness(pos + 1, strip.Color(r/2, g/2, b/2));
+//    setPixelAtBrightness(pos + 2, strip.Color(r/4, g/4, b/4));
+
+    strip.setPixelColor(pos - 2, strip.Color(r/4, g/4, b/4)); 
+    strip.setPixelColor(pos - 1, strip.Color(r/2, g/2, b/2)); 
+    strip.setPixelColor(pos, strip.Color(r, g, b)); 
+    strip.setPixelColor(pos + 1, strip.Color(r/2, g/2, b/2)); 
+    strip.setPixelColor(pos + 2, strip.Color(r/4, g/4, b/4)); 
+
 
     strip.show();
     // If we wanted to be sneaky we could erase just the tail end
@@ -823,12 +879,18 @@ void scanner(uint32_t c, uint16_t wait) {
     for(j=-2; j<= 2; j++) 
         strip.setPixelColor(pos+j, strip.Color(0,0,0));
         
-    setPixelAtBrightness(pos - 1, strip.Color(r/4, g/4, b/4));
-    setPixelAtBrightness(pos - 0, strip.Color(r/2, g/2, b/2));
-    setPixelAtBrightness(pos+1, strip.Color(r, g, b));
-    setPixelAtBrightness(pos + 2, strip.Color(r/2, g/2, b/2));
-    setPixelAtBrightness(pos + 3, strip.Color(r/4, g/4, b/4));
+//    setPixelAtBrightness(pos - 1, strip.Color(r/4, g/4, b/4));
+//    setPixelAtBrightness(pos - 0, strip.Color(r/2, g/2, b/2));
+//    setPixelAtBrightness(pos+1, strip.Color(r, g, b));
+//    setPixelAtBrightness(pos + 2, strip.Color(r/2, g/2, b/2));
+//    setPixelAtBrightness(pos + 3, strip.Color(r/4, g/4, b/4));
 
+    strip.setPixelColor(pos - 1, strip.Color(r/4, g/4, b/4)); 
+    strip.setPixelColor(pos - 0, strip.Color(r/2, g/2, b/2)); 
+    strip.setPixelColor(pos+1, strip.Color(r, g, b)); 
+    strip.setPixelColor(pos + 2, strip.Color(r/2, g/2, b/2)); 
+    strip.setPixelColor(pos + 3, strip.Color(r/4, g/4, b/4)); 
+    
     strip.show();
     // If we wanted to be sneaky we could erase just the tail end
     // pixel, but it's much easier just to erase the whole thing
@@ -864,40 +926,69 @@ void wave(uint32_t c, uint16_t wait) {
         g2 = (byte)((float)g * y);
         b2 = (byte)((float)b * y);
       }
-      setPixelAtBrightness(i, strip.Color(r2, g2, b2));
-//      strip.setPixelColor(i, r2, g2, b2);
+//      setPixelAtBrightness(i, strip.Color(r2, g2, b2));
+      strip.setPixelColor(i, r2, g2, b2);
     }
     strip.show();
 }
 
 
-//Input a value 0 to 384 to get a color value.
+//Input a value 0 to 255 to get a color value.
 //The colours are a transition r - g - b - back to r
 
 uint32_t Wheel(uint16_t WheelPos)
 {
-  byte r, g, b;
-  switch(WheelPos / 128)
+  
+  // LPD8806
+  if(LED_TYPE == 0)
   {
-    case 0:
-      r = 127 - WheelPos % 128; // red down
-      g = WheelPos % 128;       // green up
-      b = 0;                    // blue off
-      break;
-    case 1:
-      g = 127 - WheelPos % 128; // green down
-      b = WheelPos % 128;       // blue up
-      r = 0;                    // red off
-      break;
-    case 2:
-      b = 127 - WheelPos % 128; // blue down
-      r = WheelPos % 128;       // red up
-      g = 0;                    // green off
-      break;
+    byte r, g, b;
+    switch(WheelPos / 128)
+    {
+      case 0:
+        r = 127 - WheelPos % 128; // red down
+        g = WheelPos % 128;       // green up
+        b = 0;                    // blue off
+        break;
+      case 1:
+        g = 127 - WheelPos % 128; // green down
+        b = WheelPos % 128;       // blue up
+        r = 0;                    // red off
+        break;
+      case 2:
+        b = 127 - WheelPos % 128; // blue down
+        r = WheelPos % 128;       // red up
+        g = 0;                    // green off
+        break;
+    }
+    return(strip.Color(r,g,b));
   }
-  return(strip.Color(r,g,b));
+  
+  // WS2811
+  if(LED_TYPE == 1)
+  {
+    if(WheelPos < 85) {
+     return strip.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
+    } else if(WheelPos < 170) {
+     WheelPos -= 85;
+     return strip.Color(255 - WheelPos * 3, 0, WheelPos * 3);
+    } else {
+     WheelPos -= 170;
+     return strip.Color(0, WheelPos * 3, 255 - WheelPos * 3);
+    }
+  } 
+  
+  return strip.Color(10,10,10);
 }
 
+void fullWhiteTest() {
+
+    for (int i=0; i < strip.numPixels(); i++) 
+      {
+     strip.setPixelColor(i, strip.Color(255,255,255));
+      }
+    strip.show();
+}
 
 uint32_t dampenBrightness(uint32_t c, int brightness) {
 

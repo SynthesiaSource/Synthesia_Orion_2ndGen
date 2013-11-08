@@ -63,7 +63,12 @@
 // Change this variable to match the number of pixels in your setup
 // If numberPixels is less than the total LEDs connected, some LEDs will go unlit
 // If numberPixels is greater than the total LEDs connected, you will get lower performance than if it exactly matches.
-#define PIXEL_COUNT            32
+#define PIXEL_COUNT  32
+
+// Defines LED type. 
+// Type 0 is LPD8806
+// Type 1 is WS2811
+#define LED_TYPE      1
 
 #define PI 3.14159265
 #define dist(a, b, c, d) sqrt(double((a - c) * (a - c) + (b - d) * (b - d)))
@@ -102,6 +107,7 @@ void wave(uint32_t c, uint16_t wait);             // Sine wave color ranges from
 void randomSparkle(uint16_t wait);                // Sparkles with random colors at random points. Medium drain mode.
 void canada();
 void canada2();
+void fullWhiteTest();
 
 // Internal utility functions.
 uint32_t Wheel(uint16_t WheelPos);

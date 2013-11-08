@@ -6,19 +6,12 @@
 #include "orion.h"
 
 boolean poweredOn = false;
+boolean powerSemaphore = false;
+int powerCounter = 0;
 
-//
 void togglePower(void) 
 {
-  noInterrupts();
-  poweredOn = !poweredOn;
-  
-  if(poweredOn)
-  {
-    updateBatteryStatus(poweredOn);
-    updateOrion();
-  }
-  interrupts();
+  powerSemaphore = true;
 } // togglePower()
 
 
@@ -34,10 +27,10 @@ void setup()
   
   // Attach button interrupts
   interrupts();
-  PCintPort::attachInterrupt(PIN_BUTTON_MODE, &stepMode, FALLING);
-  PCintPort::attachInterrupt(PIN_BUTTON_SPEED, &stepSpeed, FALLING);
-  attachInterrupt(INT1, &stepBrightness, FALLING);
-  attachInterrupt(INT0, &togglePower, FALLING);
+  PCintPort::attachInterrupt(PIN_BUTTON_MODE, &stepMode, RISING);
+  PCintPort::attachInterrupt(PIN_BUTTON_SPEED, &stepSpeed, RISING);
+  attachInterrupt(INT1, &stepBrightness, RISING);
+  attachInterrupt(INT0, &togglePower, RISING);
 // Does not work. ???
 //  attachInterrupt(PIN_BUTTON_LEVEL, &stepBrightness, FALLING);
 //  attachInterrupt(PIN_BUTTON_POWER, &togglePower, FALLING);
@@ -48,7 +41,25 @@ void setup()
 
 
 void loop() {
-
+  
+  if(powerSemaphore)
+  {
+  if(digitalRead(PIN_BUTTON_POWER)==HIGH)
+  {
+    powerCounter++; 
+  } else {
+    powerSemaphore = false; // Disarm the semaphore (button press time < minimum) 
+    powerCounter = 0;
+  }
+  
+  if(powerCounter>10)
+    {
+    poweredOn = !poweredOn;
+    powerSemaphore = false;
+    powerCounter = 0;
+    } 
+  }
+  
   updateBatteryStatus(poweredOn);
 
   // Start up the device

@@ -26,7 +26,8 @@ class LPD8806 {
     updatePins(void),                       // Change pins, hardware SPI
     updateLength(uint16_t n),               // Change strip length
     enable(boolean setBegun),  // Power up, activate SPI
-    disable(void);             // Power down, disable SPI
+    disable(void),             // Power down, disable SPI
+    setBrightness(uint8_t);
     boolean isEnabled(void);   // 
     boolean isDisabled(void);  // 
   uint16_t
@@ -43,7 +44,8 @@ class LPD8806 {
   uint8_t
     *pixels,    // Holds LED color values (3 bytes each) + latch
     clkpin    , datapin,     // Clock & data pin numbers
-    clkpinmask, datapinmask; // Clock & data PORT bitmasks
+    clkpinmask, datapinmask, // Clock & data PORT bitmasks
+    brightness;    // Global brightness
   volatile uint8_t
     *clkport  , *dataport;   // Clock & data PORT registers
   void

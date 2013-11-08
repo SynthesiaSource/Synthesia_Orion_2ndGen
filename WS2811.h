@@ -37,6 +37,7 @@ class WS2811 {
 
   // Constructor: number of LEDs, pin number, LED type
   WS2811(uint16_t n, uint8_t p=6, uint8_t t=NEO_GRB + NEO_KHZ800);
+  WS2811(void); // Empty constructor; init pins & strip length later
 
   void
     begin(void),
@@ -44,7 +45,9 @@ class WS2811 {
     setPixelColor(uint16_t n, uint8_t r, uint8_t g, uint8_t b),
     setPixelColor(uint16_t n, uint32_t c),
     enable(boolean setBegun),  // Power up, activate SPI
-    disable(void);             // Power down, disable SPI
+    disable(void),             // Power down, disable SPI
+    setBrightness(uint8_t);
+
     boolean isEnabled(void);   // 
     boolean isDisabled(void);  // 
   uint16_t
@@ -60,6 +63,7 @@ class WS2811 {
     numBytes;      // Size of 'pixels' buffer below
   uint8_t
    *pixels,        // Holds LED color values (3 bytes each)
+    brightness,    // Global brightness
     pin,           // Output pin number
     pinMask,       // Output PORT bitmask
     type;          // Pixel flags (400 vs 800 KHz, RGB vs GRB color)

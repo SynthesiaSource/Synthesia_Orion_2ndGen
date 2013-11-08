@@ -319,6 +319,12 @@ uint32_t LPD8806::Color(byte r, byte g, byte b) {
 // Set pixel color from separate 7-bit R, G, B components:
 void LPD8806::setPixelColor(uint16_t n, uint8_t r, uint8_t g, uint8_t b) {
   if(n < numLEDs) { // Arrays are 0-indexed, thus NOT '<='
+      if(brightness) 
+      { // See notes in setBrightness()
+      r = (r * brightness) >> 8;
+      g = (g * brightness) >> 8;
+      b = (b * brightness) >> 8;
+      }
     uint8_t *p = &pixels[n * 3];
     *p++ = g | 0x80; // Strip color order is GRB,
     *p++ = r | 0x80; // not the more common RGB,
@@ -329,10 +335,19 @@ void LPD8806::setPixelColor(uint16_t n, uint8_t r, uint8_t g, uint8_t b) {
 // Set pixel color from 'packed' 32-bit GRB (not RGB) value:
 void LPD8806::setPixelColor(uint16_t n, uint32_t c) {
   if(n < numLEDs) { // Arrays are 0-indexed, thus NOT '<='
+      uint8_t
+      r = (uint8_t)(c >> 16),
+      g = (uint8_t)(c >>  8),
+      b = (uint8_t)c;
+    if(brightness) { // See notes in setBrightness()
+      r = (r * brightness) >> 8;
+      g = (g * brightness) >> 8;
+      b = (b * brightness) >> 8;
+    }
     uint8_t *p = &pixels[n * 3];
-    *p++ = (c >> 16) | 0x80;
-    *p++ = (c >>  8) | 0x80;
-    *p++ =  c        | 0x80;
+    *p++ = g | 0x80; // Strip color order is GRB,
+    *p++ = r | 0x80; // not the more common RGB,
+    *p++ = b | 0x80; // so the order here is intentional; don't "fix"
   }
 }
 
@@ -346,4 +361,29 @@ uint32_t LPD8806::getPixelColor(uint16_t n) {
   }
 
   return 0; // Pixel # is out of bounds
+}
+
+void LPD8806::setBrightness(uint8_t b) {
+  // Stored brightness value is different than what's passed.
+  // This simplifies the actual scaling math later, allowing a fast
+  // 8x8-bit multiply and taking the MSB.  'brightness' is a uint8_t,
+  // adding 1 here may (intentionally) roll over...so 0 = max brightness
+  // (color values are interpreted literally; no scaling), 1 = min
+  // brightness (off), 255 = just below max brightness.
+  uint8_t newBrightness = b + 1;
+  if(newBrightness != brightness) { // Compare against prior value
+    // Brightness has changed -- re-scale existing data in RAM
+    uint8_t  c,
+            *ptr           = pixels,
+             oldBrightness = brightness - 1; // De-wrap old brightness value
+    uint16_t scale;
+    if(oldBrightness == 0) scale = 0; // Avoid /0
+    else if(b == 255) scale = 65535 / oldBrightness;
+    else scale = (((uint16_t)newBrightness << 8) - 1) / oldBrightness;
+    for(uint16_t i=0; i<numBytes; i++) {
+      c      = *ptr;
+      *ptr++ = (c * scale) >> 8;
+    }
+    brightness = newBrightness;
+  }
 }
