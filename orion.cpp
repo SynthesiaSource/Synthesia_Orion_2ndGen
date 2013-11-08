@@ -155,6 +155,10 @@ void updateOrion() {
        
       if(mode > NUMBER_OF_MODES)
         mode = 0;
+        
+      // Force redraw of new mode by increasing the speed from paused.
+      if(syspeed == NUMBER_SPEED_SETTINGS)
+         syspeed = NUMBER_SPEED_SETTINGS-1;
          
       frameStep = 0;
       animationStep = 0;
@@ -174,6 +178,10 @@ void updateOrion() {
   // If insufficient time has elapsed since the last call just return and do nothing.
   // Each animation needs to be calibrated using frameDelayTimer to get a good range of speeds.
   if(currentMillis - previousMillis < frameDelayTimer*syspeed)    
+    return;
+    
+  //Pause animations if speed is set to highest (slowest) setting.
+  if(syspeed == NUMBER_SPEED_SETTINGS)
     return;
     
   previousMillis = currentMillis;
@@ -261,6 +269,7 @@ void updateOrion() {
   // Global animation frame limit of WHEEL_RANGE (for full color wheel range).
   // Large animationSteps slow down the driver.
   animationStep++;
+    
   if(animationStep>WHEEL_RANGE)
     animationStep = 0;
   
@@ -323,39 +332,36 @@ void rainbowBreathing()
 {
   static int shifter = 0;
   uint16_t i, j;
+  int pixelCount = strip.numPixels();
+  
+  int ceiling = (255/NUMBER_BRIGHTNESS_LEVELS)*(NUMBER_BRIGHTNESS_LEVELS-brightness);
+  
   if(animationStep<(WHEEL_RANGE/2))
   {
-  float modifier = 0.25+0.004*(float)animationStep;
+    uint16_t i, j;
+    int pixelCount = strip.numPixels();
+    // Use ceiling so that the max brightness scales with the rest of the modes.
+    int fadeAnimation = map(animationStep, 0, WHEEL_RANGE/2, 0, ceiling);
+    
+    for (i=0; i < pixelCount; i++) 
+      strip.setPixelColor(i, Wheel(((i * (WHEEL_RANGE / pixelCount))) % WHEEL_RANGE)); 
+      
+    strip.setBrightness(fadeAnimation);
 
-    for (i=0; i < strip.numPixels(); i++) 
-      {
-      uint32_t c =  Wheel(((i * WHEEL_RANGE / PIXEL_COUNT)) % WHEEL_RANGE);
-
-      byte  r, g, b;
-      // Need to decompose color into its r, g, b elements
-      g = (c >> 16) & 0x7f;
-      r = (c >>  8) & 0x7f;
-      b =  c        & 0x7f; 
-     
-      strip.setPixelColor(i, r*modifier, g*modifier, b*modifier);
-    }
-  strip.show();   // write all the pixels out
+    strip.show();   // write all the pixels out
   } else {
-  float modifier = 1.75-0.004*(float)animationStep;
+    uint16_t i, j;
+    int pixelCount = strip.numPixels();
+    // Use ceiling so that the max brightness scales with the rest of the modes.
+    int scaleAS = map(animationStep, WHEEL_RANGE/2, WHEEL_RANGE, 0, ceiling);
+    int fadeAnimation = ceiling-scaleAS;
+          
+    for (i=0; i < pixelCount; i++) 
+      strip.setPixelColor(i, Wheel(((i * (WHEEL_RANGE / pixelCount))) % WHEEL_RANGE)); 
+      
+    strip.setBrightness(fadeAnimation);
 
-    for (i=0; i < strip.numPixels(); i++) 
-      {
-      uint32_t c =  Wheel(((i * WHEEL_RANGE / PIXEL_COUNT)+shifter) % WHEEL_RANGE);
- 
-      byte  r, g, b;
-      // Need to decompose color into its r, g, b elements
-      g = (c >> 16) & 0x7f;
-      r = (c >>  8) & 0x7f;
-      b =  c        & 0x7f; 
-     
-     strip.setPixelColor(i, r*modifier, g*modifier, b*modifier);
-    }
-  strip.show();   // write all the pixels out   
+    strip.show();   // write all the pixels out
   }
 } 
   
@@ -423,7 +429,10 @@ void fadeOut(uint32_t c)
 
   byte  r, g, b, r2, g2, b2, r8, g8,b8;
   
+  
   // Need to decompose color into its r, g, b elements
+  if(LED_TYPE == 0)
+  {
   g = (c >> 16) & 0x7f;
   r = (c >>  8) & 0x7f;
   b =  c        & 0x7f; 
@@ -473,14 +482,71 @@ void fadeOut(uint32_t c)
       strip.setPixelColor(i, r2, g2, b2);
     
     strip.show();   // write all the pixels out
+  }
+  
+  if(LED_TYPE == 1)
+  {
+    r = (uint8_t)(c >> 16),
+    g = (uint8_t)(c >>  8),
+    b = (uint8_t)c;
+ 
+  r8 = r;
+  g8 = g;
+  b8 = b;
+
+  byte highColorByte = 0;
+  if(g8>highColorByte)
+  {highColorByte= g8; }  
+  if(r8>highColorByte)
+  {highColorByte= r8; }
+  if(b8>highColorByte)
+  {highColorByte= b8; }  
+
+  byte lowColorByte = WHEEL_RANGE;
+  if(g8 < lowColorByte)
+  {lowColorByte= g8; }  
+  if(r8 < lowColorByte)
+  {lowColorByte= r8; }
+  if(b8 < lowColorByte)
+  {lowColorByte= b8; }   
+  
+  int y = 0 + (float)lowColorByte*((float)animationStep/(WHEEL_RANGE/2));
+
+      if(g8>y)
+      {
+        g2 =  gamma(g8-y);
+      } else {
+        g2 = gamma(0); 
+      }
+      if(r8>y)
+      {
+        r2 =  gamma(r8-y);
+      } else {
+        r2 = gamma(0); 
+      }
+      if(b8>y)
+      {
+        b2 =  gamma(b8-y);
+      } else {
+        b2 = gamma(0); 
+      }
+      
+    for (int i=0; i < strip.numPixels(); i++) 
+      strip.setPixelColor(i, r2, g2, b2);
+    
+    strip.show();   // write all the pixels out
+  }
 }
 
 
 void fadeIn(uint32_t c)
 {
-  byte  r, g, b, r2, g2, b2, r8, g8,b8;
-  
+    byte  r, g, b, r2, g2, b2, r8, g8,b8;
+
   // Need to decompose color into its r, g, b elements
+  if(LED_TYPE == 0)
+  {
+  
   g = (c >> 16) & 0x7f;
   r = (c >>  8) & 0x7f;
   b =  c        & 0x7f; 
@@ -529,6 +595,59 @@ void fadeIn(uint32_t c)
       strip.setPixelColor(i, r2, g2, b2);
     
     strip.show();   // write all the pixels out
+  }
+  
+  if(LED_TYPE == 1)
+  {
+    r = (uint8_t)(c >> 16),
+    g = (uint8_t)(c >>  8),
+    b = (uint8_t)c;
+
+  r8 = r;
+  g8 = g;
+  b8 = b;
+
+  byte highColorByte = 0;
+  if(g8>highColorByte)
+  {highColorByte= g8; }  
+  if(r8>highColorByte)
+  {highColorByte= r8; }
+  if(b8>highColorByte)
+  {highColorByte= b8; }  
+
+  byte lowColorByte = 255;
+  if(g8 < lowColorByte)
+  {lowColorByte= g8; }  
+  if(r8 < lowColorByte)
+  {lowColorByte= r8; }
+  if(b8 < lowColorByte)
+  {lowColorByte= b8; }   
+
+  int y = (float)lowColorByte - (float)lowColorByte*((float)animationStep/(WHEEL_RANGE/2));
+
+      if(g8>y)
+      {
+        g2 =  gamma(g8-y);
+      } else {
+        g2 = gamma(0); 
+      }
+      if(r8>y)
+      {
+        r2 =  gamma(r8-y);
+      } else {
+        r2 = gamma(0); 
+      }
+      if(b8>y)
+      {
+        b2 =  gamma(b8-y);
+      } else {
+        b2 = gamma(0); 
+      }
+    for (int i=0; i < strip.numPixels(); i++) 
+      strip.setPixelColor(i, r2, g2, b2);
+    
+    strip.show();   // write all the pixels out
+  }
 }
 
 

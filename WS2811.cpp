@@ -563,16 +563,7 @@ void WS2811::show(void) {
   endTime = micros(); // Note EOD time for latch on next call
 }
 
-// Set pixel color from separate R,G,B components:
-//void WS2811::setPixelColor(
-// uint16_t n, uint8_t r, uint8_t g, uint8_t b) {
-//  if(n < numLEDs) {
-//    uint8_t *p = &pixels[n * 3];
-//    if((type & NEO_COLMASK) == NEO_GRB) { *p++ = g; *p++ = r; }
-//    else                                { *p++ = r; *p++ = g; }
-//    *p = b;
-//  }
-//}
+
 // Set pixel color from separate R,G,B components:
 void WS2811::setPixelColor(
  uint16_t n, uint8_t r, uint8_t g, uint8_t b) {
@@ -589,15 +580,6 @@ void WS2811::setPixelColor(
   }
 }
 
-// Set pixel color from 'packed' 32-bit RGB color:
-//void WS2811::setPixelColor(uint16_t n, uint32_t c) {
-//  if(n < numLEDs) {
-//    uint8_t *p = &pixels[n * 3];
-//    if((type & NEO_COLMASK) == NEO_GRB) { *p++ = c >>  8; *p++ = c >> 16; }
-//    else                                { *p++ = c >> 16; *p++ = c >>  8; }
-//    *p = c;
-//  }
-//}
 
 // Set pixel color from 'packed' 32-bit RGB color:
 void WS2811::setPixelColor(uint16_t n, uint32_t c) {
@@ -606,7 +588,8 @@ void WS2811::setPixelColor(uint16_t n, uint32_t c) {
       r = (uint8_t)(c >> 16),
       g = (uint8_t)(c >>  8),
       b = (uint8_t)c;
-    if(brightness) { // See notes in setBrightness()
+    if(brightness) 
+    { // See notes in setBrightness()
       r = (r * brightness) >> 8;
       g = (g * brightness) >> 8;
       b = (b * brightness) >> 8;
@@ -614,7 +597,7 @@ void WS2811::setPixelColor(uint16_t n, uint32_t c) {
     uint8_t *p = &pixels[n * 3];
     if((type & NEO_COLMASK) == NEO_GRB) { *p++ = g; *p++ = r; }
     else                                { *p++ = r; *p++ = g; }
-    *p = c;
+    *p = b;
   }
 }
 
